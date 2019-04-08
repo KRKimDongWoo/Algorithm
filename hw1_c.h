@@ -63,7 +63,7 @@ int deterministic_select(int a[], int n, int k){
 
 	/* n == 1 : trivial */
 	if(n == 1) return a[0];
-	/* n <= 5 : doen by insertion_sort, since there is only 1 block */
+	/* n <= 5 : done by insertion_sort, since there is only 1 block */
 	if(n <= 5) {
 		insertion_sort(a, n);
 		return a[k];
