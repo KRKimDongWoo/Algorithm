@@ -7,6 +7,7 @@
 int main(){
 	clock_t before;
 	double time;
+	double avg = 0;
 	int* arr;
 	int* tmp;
 	int n, k;
@@ -16,31 +17,24 @@ int main(){
 	arr = calloc(n, sizeof(int));
 	tmp = calloc(n, sizeof(int));
 
-	for(int i = 0; i < n; i++){
+	for(int i = 0; i < n; i++)
 		scanf("%d", &arr[i]);
-	}
 
 	printf("Result of randomized selection with n=%d\n", n);
-
 	for(int i = 0; i < 15; i++){
 		memcpy(tmp, arr, n * sizeof(int));
-		
 		before = clock();
 		ans = randomized_select(tmp, n, k);
 		time = (double)(clock() - before) / (CLOCKS_PER_SEC/1000);
 		if(i >= 5){
 			printf("test %d\t: ", i - 4);
-			if(checker(arr, n, k, ans)){
-				printf("Correct!\t");
-			}
-		
-			else {
-				printf("Wrong!\t");
-			}
+			if(checker(arr, n, k, ans)) printf("Correct!\t");
+			else printf("Wrong!\t");
 			printf("Total time : %5.2fms\n", time);
+			avg += time;
 		}
 	}
-
+	printf("Average : %5.2fms\n", avg / 10);
 	
 	return 0;
 }
