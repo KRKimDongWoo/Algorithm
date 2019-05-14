@@ -3,6 +3,12 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
+#define INSERT 0
+#define DELETE 1
+#define SELECT 2
+#define RANK 3
 
 /* enumerate colors */
 typedef enum {
@@ -34,15 +40,7 @@ typedef struct node {
  */
 color_t get_color(node_t* T);
 int get_size(node_t* T);
-
-/* Family finding helper functions.
- * These functions will return pointer of sibling/grandparent/
- * uncle, no matter if they are left or right child.
- */
 node_t* get_child(node_t* P, direction_t dir);
-node_t* get_sibling(node_t* T);
-node_t* get_grandparent(node_t* T);
-node_t* get_uncle(node_t* T);
 
 /* Safe set functions.
  * These functions also handle for NULL inputs.
@@ -84,10 +82,12 @@ void print_tree(node_t* T, int space);
 
 /* Global variables.
  */
-int v[10000];
-int cnt;
 static node_t* root = NULL;
 
+/* Global variables for checker
+ */
+static int cnt;
+static int v[10000];
 
 int cmp(const void *a, const void *b){
 	int n1 = *(int*)a;
@@ -104,16 +104,11 @@ int cmp(const void *a, const void *b){
 }
 
 void init(){
-	cnt = 0;
+	root = NULL;
 }
 
 int os_insert(int x){
-    for(int i=0;i<cnt;i++){
-		if(x==v[i]){
-			return 0;
-		}
-	}
-	
+
 	node_t* curr = root;
 	node_t* new_node = (node_t*) malloc(sizeof(node_t));
 	
@@ -126,7 +121,7 @@ int os_insert(int x){
 	new_node->color = RED;
 
 
-	if(cnt == 0) {
+	if(curr == NULL) {
 		/* None element is current.
 		 * Therefore, set a new Node as a root node. 
 		 */
@@ -161,7 +156,7 @@ int os_insert(int x){
 			}
 			else {
 				/* Current node is same with x.
-				 * Expecting never reach here. */
+				 * Nothing to do, return 0. */
 				return 0;
 			}
 		}
@@ -169,141 +164,117 @@ int os_insert(int x){
 		insert_stablize(new_node);
 	}
 
-	v[cnt++] = x;
 	//print_tree(root, 0);
 	return x;
 }
 
 int os_delete(int x){
 
-    int k = 0;
-	for(int i=0;i<cnt;i++){
-		if(v[i]==x){
-			k = 1;
-		}
-		else{
-			v[i-k] = v[i];
+	/* Found element : delete and return x */
+	int flag = 0;
+	node_t* curr = root;
+	node_t* target;
+
+	while(curr != NULL) {
+		curr->size -= 1;
+		if(x > curr->data)
+			curr = curr->right;
+		else if(x < curr->data)
+			curr = curr->left;
+		else {
+			flag = 1;
+			break;
 		}
 	}
 
-	if(k==1){
-		/* Found element : delete and return x */
-		int flag = 0;
-		node_t* curr = root;
-		node_t* target;
+	if(!flag) /* No element has found. return 0 */
+		return 0;
+	
+	flag = 0;
 
-		while(curr != NULL) {
-			curr->size -= 1;
-			if(x > curr->data)
-				curr = curr->right;
-			else if(x < curr->data)
-				curr = curr->left;
+	if((curr->left != NULL) && (curr->right != NULL)) {
+		/* Current node has two children.
+		 * Swap with the left-most node on right subtree.
+		 * And then, changes the target.
+		 */			
+		target = curr->left;
+		while(target != NULL) {
+			target->size -= 1;
+			if(target->right != NULL)
+				target = target->right;
 			else
 				break;
 		}
-		
-		if((curr->left != NULL) && (curr->right != NULL)) {
-			/* Current node has two children.
-			 * Swap with the left-most node on right subtree.
-			 * And then, changes the target.
-			 */			target = curr->left;
-			while(target != NULL) {
-				target->size -= 1;
-				if(target->right != NULL)
-					target = target->right;
-				else
-					break;
-			}
-			int tmp = target->data;
-			target->data = curr->data;
-			curr->data = tmp;
-		}
-		else
-			target = curr;
+		int tmp = target->data;
+		target->data = curr->data;
+		curr->data = tmp;
+	}
+	else
+		target = curr;
 
-		/* Remove the target */
-		if((get_color(target) == BLACK) && (get_color(get_child(target, NONE)) == BLACK)){
-			/* Target and its child are both black.
-			 * Problem occured, so set flag.
-			 */
-			flag = 1;
-		}
-
-		node_t* P = target->parent;
-		node_t* C = get_child(target, NONE);
-		direction_t target_dir = which_child(target);
-
-		set_child(P, C, target_dir);
-		set_parent(C, P);
-		set_color(C, BLACK);
-
-		free(target);
-
-		if(flag){
-			delete_stablize(P, target_dir);
-		}
-
-		--cnt;
-		//print_tree(root, 0);
-		return x;
+	/* Remove the target */
+	if((get_color(target) == BLACK) && (get_color(get_child(target, NONE)) == BLACK)){
+		/* Target and its child are both black.
+		 * Problem occured, so set flag.
+		 */
+		flag = 1;
 	}
 
-	else{
-		/* No element : return 0 */
-		return 0;
+	node_t* P = target->parent;
+	node_t* C = get_child(target, NONE);
+	direction_t target_dir = which_child(target);
+	set_child(P, C, target_dir);
+	set_parent(C, P);
+	set_color(C, BLACK);
+	free(target);
+
+	if(flag){
+		delete_stablize(P, target_dir);
 	}
+
+	//print_tree(root, 0);
+	return x;
 }
 
 int os_select(int i){
-    if(i-1<cnt){
-		qsort(v,cnt,sizeof(int),cmp);
-        return v[i-1];
-    }
-    else{
-        return 0;
-    }   
-}
-
-int os_rank(int x){
-	qsort(v,cnt,sizeof(int),cmp);
-	for(int i=0;i<cnt;i++){
-		if(v[i]==x){
-			return i + 1;
+	node_t* curr = root;
+	int rank = 0;
+	while(curr != NULL){
+		rank += get_size(get_child(curr, LEFT)) + 1;
+		if(rank > i){
+			rank -= get_size(get_child(curr, LEFT)) + 1;
+			curr = curr->left;
 		}
+		else if(rank < i){
+			curr = curr->right;
+		}
+		else
+			return curr->data;
 	}
 	return 0;
 }
 
-int check(int opt_seq[], int in_seq[], int out_seq[], int n){
-    init();
-    for(int i=0;i<n;i++){
-		if(opt_seq[i]==0){
-            if(os_insert(in_seq[i])!=out_seq[i]){
-                return 0;
-            }
-        }
-        else if(opt_seq[i]==1){
-            if(os_delete(in_seq[i])!=out_seq[i]){
-                return 0;
-            }
-        }
-        else if(opt_seq[i]==2){
-            if(os_select(in_seq[i])!=out_seq[i]){
-                return 0;
-            }
-        }
-        else if(opt_seq[i]==3){
-            if(os_rank(in_seq[i])!=out_seq[i]){
-                return 0;
-            }
-        }
-    }
-    return 1;
+int os_rank(int x){
+	node_t* curr = root;
+	int rank = 0;
+	while(curr != NULL){
+		rank += get_size(get_child(curr, LEFT)) + 1;
+		if(curr->data > x){
+			rank -= get_size(get_child(curr, LEFT)) + 1;
+			curr = curr->left;
+		}
+		else if(curr->data < x){
+			curr = curr->right;
+		}
+		else
+			return rank;
+	}
+	return 0;
 }
 
 void insert_stablize(node_t* T) {
 	if(T == NULL) {
-		/* Wrong input, nothing to do.
+		/* Wrong parameter, nothing to do.
 		 * Expecting never reach here. 
 		 */
 		return;
@@ -321,20 +292,23 @@ void insert_stablize(node_t* T) {
 			/* T is red.
 			 * Check for correctness.
 			 */
-			if(T->parent->color == RED) {
+			node_t* P = T->parent;
+			if(get_color(P) == RED) {
 				/* Parent is red.
 				 * RB tree is collapsed, so stablize.
 				 */
-				if(get_color(get_uncle(T)) == RED){
+				node_t* G = P->parent;
+				node_t* S = get_child(G, !which_child(P));
+				if(get_color(S) == RED){
 					/* Case 1
 					 * T is red, p is red and s is red.
 					 * Change the color, and stablize recursively.
 					 */
-					set_color(T->parent, BLACK);
-					set_color(get_uncle(T), BLACK);
-					set_color(get_grandparent(T), RED);
+					set_color(P, BLACK);
+					set_color(S, BLACK);
+					set_color(G, RED);
 
-					insert_stablize(get_grandparent(T));
+					insert_stablize(G);
 				} /* Case 1 */
 				else {
 					/* Case 2
@@ -347,7 +321,6 @@ void insert_stablize(node_t* T) {
 						 * Rotate and stablize recursively.
 						 * It will call case 2-2 in result.
 						 */
-						node_t* G = get_grandparent(T);
 						direction_t dir = !which_child(T);
 
 						set_child(G, rotate(T->parent, dir), dir);
@@ -358,17 +331,11 @@ void insert_stablize(node_t* T) {
 						 * T and parent grow in same direction.
 						 * Rotate and change color.
 						 */
-						node_t* G = get_grandparent(T);
 						node_t* PG = G->parent;
+						direction_t G_dir = which_child(G);
+						direction_t T_dir = which_child(T);
 
-						if(PG == NULL) {
-							root = rotate(G, !which_child(T));
-						}
-						else {
-							direction_t G_dir = which_child(G);
-							direction_t T_dir = which_child(T);
-							set_child(PG, rotate(G, !T_dir), G_dir);
-						}
+						set_child(PG, rotate(G, !T_dir), G_dir);
 						set_color(G, RED);
 						set_color(G->parent, BLACK);
 					} /* Case 2-2 */
@@ -392,10 +359,8 @@ void delete_stablize(node_t* P, direction_t dir) {
 			/* case X-2 */
 			node_t* G = P->parent;
 			direction_t P_dir = which_child(P);
-			if(G == NULL)
-				root = rotate(P, dir);
-			else
-				set_child(G, rotate(P, dir), P_dir);
+
+			set_child(G, rotate(P, dir), P_dir);
 
 			set_color(S, get_color(P));
 			set_color(P, BLACK);
@@ -430,10 +395,8 @@ void delete_stablize(node_t* P, direction_t dir) {
 		/* case 2-4 */
 		node_t* G = P->parent;
 		direction_t P_dir = which_child(P);
-		if(G == NULL)
-			root = rotate(P, dir);
-		else
-			set_child(G, rotate(P, dir), P_dir);
+
+		set_child(G, rotate(P, dir), P_dir);
 		
 		set_color(P, RED);
 		set_color(S, BLACK);
@@ -473,39 +436,16 @@ int get_size(node_t* T) {
 		return T->size;
 }
 
-node_t* get_sibling(node_t* T) {
-	if(T->parent == NULL)
-		return NULL;
-	else
-		return get_child(T->parent, !which_child(T));
-}
-
-node_t* get_grandparent(node_t* T) {
-	if(T->parent == NULL)
-		return NULL;
-	else
-		return T->parent->parent;
-}
-
-node_t* get_uncle(node_t* T) {
-	return get_sibling(T->parent);
-}
-
-node_t* get_one_child(node_t* T) {
-	if(T->left == NULL)
-		return T->right;
-	else
-		return T->left;
-}
-
 node_t* get_child(node_t* P, direction_t dir) {
+	if(P == NULL)
+		return NULL;
 	switch(dir) {
 		case RIGHT:
 			return P->right;
 		case LEFT:
 			return P->left;
 		case NONE:
-			return get_one_child(P);
+			return (P->left == NULL) ? P->right : P->left;
 	}
 }
 
@@ -531,21 +471,6 @@ void set_child(node_t* P, node_t* C, direction_t dir) {
 	}
 }
 
-
-void set_right(node_t* P, node_t* C) {
-	if(P == NULL)
-		return;
-	else
-		P->right = C;
-}
-
-void set_left(node_t* P, node_t* C) {
-	if(P == NULL)
-		return;
-	else
-		P->left = C;
-}
-
 void set_parent(node_t* C, node_t* P) {
 	if(C == NULL)
 		return;
@@ -565,15 +490,6 @@ void update_size(node_t* T) {
 		return;
 	else
 		T->size = get_size(T->left) + get_size(T->right) + 1;
-}
-
-int is_right(node_t* T) {
-	if(T->parent == NULL)
-		return -1;
-	else if(T->parent->right == T)
-		return 1;
-	else
-		return 0;
 }
 
 direction_t which_child(node_t* T) {
@@ -605,37 +521,78 @@ node_t* rotate(node_t* T, direction_t dir) {
 	return X;
 }
 
-node_t* left_rotate(node_t* T) {
-	node_t* tmp = T->right->left;
-	
-	set_left(T->right, T);
-	set_parent(T->right, T->parent);
-	set_parent(T, T->right);
-
-	set_right(T, tmp);
-	set_parent(tmp, T);
-
-	update_size(T);
-	update_size(T->parent);
-
-	return (T->parent);
-
+int check_insert(int x){
+	for(int i = 0; i < cnt; i++){
+		if(x == v[i])
+			return 0;
+	}
+	cnt++;
+	return x;
+}
+int check_delete(int x){
+	int k = 0;
+	for(int i = 0; i < cnt; i++){
+		if(x == v[i])
+			k = 1;
+		else
+			v[i-k] = v[i];
+	}
+	if(k == 1) {
+		--cnt;
+		return x;
+	}
+	else {
+		return 0;
+	}
 }
 
-node_t* right_rotate(node_t* T) {
-	node_t* tmp = T->left->right;
+int check_select(int i){
+	if(i - 1 < cnt) {
+		qsort(v, cnt, sizeof(int), cmp);
+		return v[i-1];
+	}
+	else {
+		return 0;
+	}
+}
 
-	set_right(T->left, T);
-	set_parent(T->left, T->parent);
-	set_parent(T, T->left);
+int check_rank(int x){
+	qsort(v, cnt, sizeof(int), cmp);
+	for(int i = 0; i < cnt; i++){
+		if(v[i]==x){
+			return i + 1;
+		}
+	}
+	return 0;
+}
 
-	set_left(T, tmp);
-	set_parent(tmp, T);
+int check(int opt_seq[], int in_seq[], int out_seq[], int n){
+    cnt = 0;
+	memset(v, 0, 10000*sizeof(int));
 
-	update_size(T);
-	update_size(T->parent);
-
-	return(T->parent);
+    for(int i=0;i<n;i++){
+		if(opt_seq[i]==INSERT){
+            if(check_insert(in_seq[i])!=out_seq[i]){
+                return 0;
+            }
+        }
+        else if(opt_seq[i]==DELETE){
+            if(check_delete(in_seq[i])!=out_seq[i]){
+                return 0;
+            }
+        }
+        else if(opt_seq[i]==SELECT){
+            if(check_select(in_seq[i])!=out_seq[i]){
+                return 0;
+            }
+        }
+        else if(opt_seq[i]==RANK){
+            if(check_rank(in_seq[i])!=out_seq[i]){
+                return 0;
+            }
+        }
+    }
+    return 1;
 }
 
 #endif
