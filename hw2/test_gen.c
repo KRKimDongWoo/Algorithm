@@ -2,7 +2,6 @@
 #include <time.h>
 #include <stdlib.h>
 
-#define SIZE 10000
 #define OP_NUM 40000
 #define MAX 9999
 
@@ -20,13 +19,13 @@ int main() {
 				printf("I %d\n", rand() % MAX + 1);
 				break;
 			case 1:
-				printf("D %d\n", rand() % MAX + 1);
-				break;
+				printf("I %d\n", rand() % MAX + 1);
+				break;			
 			case 2:
-				printf("S %d\n", rand() % MAX + 1);
+				printf("I %d\n", rand() % MAX + 1);
 				break;
 			case 3:
-				printf("R %d\n", rand() % MAX + 1);
+				printf("I %d\n", rand() % MAX + 1);
 				break;
 		}
 	}

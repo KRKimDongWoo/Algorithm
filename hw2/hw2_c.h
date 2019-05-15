@@ -80,7 +80,7 @@ void delete_stablize(node_t* P, direction_t dir);
  */
 void print_tree(node_t* T, int space);
 
-/* Global variables.
+/* Global variable for tree.
  */
 static node_t* root = NULL;
 
@@ -89,6 +89,9 @@ static node_t* root = NULL;
 static int cnt;
 static int v[10000];
 
+/* Rules to compare to integers.
+ * Used for qsort in stdlib.
+ */
 int cmp(const void *a, const void *b){
 	int n1 = *(int*)a;
 	int n2 = *(int*)b;
@@ -103,10 +106,18 @@ int cmp(const void *a, const void *b){
 	}
 }
 
+/* MUST be called before os_functions started.
+ * It will reset the root to NULL.
+ */
 void init(){
 	root = NULL;
 }
 
+/* Insert x to the tree.
+ * If there are duplicated item, it will do nothing 
+ * and return 0. Otherwise, return x and add item
+ * into the tree.
+ */
 int os_insert(int x){
 
 	node_t* curr = root;
@@ -132,7 +143,6 @@ int os_insert(int x){
 		while(1) {
 			if(curr->data < x) {
 				/* current node is smaller then x, move to right. */
-				curr->size += 1;
 				if(curr->right == NULL) {
 					curr->right = new_node;
 					new_node->parent = curr;
@@ -144,7 +154,6 @@ int os_insert(int x){
 			}
 			else if(curr->data > x) {
 				/* current node is larger then x, move to left */
-				curr->size += 1;
 				if(curr->left == NULL) {
 					curr->left = new_node;
 					new_node->parent = curr;
@@ -156,50 +165,65 @@ int os_insert(int x){
 			}
 			else {
 				/* Current node is same with x.
-				 * Nothing to do, return 0. */
+				 * new_node is useless, so free and return 0. */
+				free(new_node);
 				return 0;
 			}
 		}
 
+		/* Check for if the tree corrupted or not,
+		 * and stablize it if it corrupted.
+		 */
 		insert_stablize(new_node);
 	}
 
-	//print_tree(root, 0);
+	/* Update the size from the new node.
+	 */
+	curr = new_node;
+	while(curr != NULL){
+		update_size(curr);
+		curr = curr->parent;
+	}
+
+
+#ifdef VERBOSE
+	/* For debug, or watch tree */
+	print_tree(root, 0);
+#endif
 	return x;
 }
 
+/* Delete x to the tree.
+ * If there are no item matches, it will do nothing 
+ * and return 0. Otherwise, return x and remove item
+ * from the tree.
+ */
 int os_delete(int x){
 
-	/* Found element : delete and return x */
-	int flag = 0;
+	int flag = 0; //flag to check is there any problem.
 	node_t* curr = root;
-	node_t* target;
+	node_t* target; //node that will be deleted
 
 	while(curr != NULL) {
-		curr->size -= 1;
 		if(x > curr->data)
 			curr = curr->right;
 		else if(x < curr->data)
 			curr = curr->left;
-		else {
-			flag = 1;
+		else 
 			break;
-		}
 	}
 
-	if(!flag) /* No element has found. return 0 */
+	if(curr == NULL) 
+		/* No element has found. return 0 */
 		return 0;
-	
-	flag = 0;
 
 	if((curr->left != NULL) && (curr->right != NULL)) {
 		/* Current node has two children.
 		 * Swap with the left-most node on right subtree.
 		 * And then, changes the target.
-		 */			
+		 */
 		target = curr->left;
 		while(target != NULL) {
-			target->size -= 1;
 			if(target->right != NULL)
 				target = target->right;
 			else
@@ -210,9 +234,11 @@ int os_delete(int x){
 		curr->data = tmp;
 	}
 	else
+		/* Current node only has one child or none.
+		 * It will be deleted, so target == curr.
+		 */
 		target = curr;
 
-	/* Remove the target */
 	if((get_color(target) == BLACK) && (get_color(get_child(target, NONE)) == BLACK)){
 		/* Target and its child are both black.
 		 * Problem occured, so set flag.
@@ -220,6 +246,9 @@ int os_delete(int x){
 		flag = 1;
 	}
 
+	/* Remove the target, and refresh 
+	 * the Parent-child relationship.
+	 */
 	node_t* P = target->parent;
 	node_t* C = get_child(target, NONE);
 	direction_t target_dir = which_child(target);
@@ -229,44 +258,77 @@ int os_delete(int x){
 	free(target);
 
 	if(flag){
+		/* Problem was detcted before, 
+		 * so stablize the tree again.
+		 */
 		delete_stablize(P, target_dir);
 	}
+	
+	/* Update the size from the parent of 
+	 * the delete node.
+	 */
+	curr = P;
+	while(curr != NULL){
+		update_size(curr);
+		curr = curr->parent;
+	}
 
-	//print_tree(root, 0);
+#ifdef VERBOSE
+	/* For debug, or watch tree */
+	print_tree(root, 0);
+#endif
+
 	return x;
 }
 
+/* Select i-th small item from the tree.
+ * If there are no item matches, it will do nothing 
+ * and return 0. Otherwise, return i-th small item
+ * from the tree.
+ */
 int os_select(int i){
 	node_t* curr = root;
 	int rank = 0;
 	while(curr != NULL){
+		/* Calulate the rank of node curr */
 		rank += get_size(get_child(curr, LEFT)) + 1;
 		if(rank > i){
+			/* Search at the left subtree */
 			rank -= get_size(get_child(curr, LEFT)) + 1;
 			curr = curr->left;
 		}
 		else if(rank < i){
+			/* Search at the right subtree */
 			curr = curr->right;
 		}
 		else
+			/* Found rank i, return the data of the curr */
 			return curr->data;
 	}
 	return 0;
 }
 
+/* Get rank of the item x.
+ * If there are no item matches, it will do nothing 
+ * and return 0. Otherwise, return rank of the x.
+ */
 int os_rank(int x){
 	node_t* curr = root;
 	int rank = 0;
 	while(curr != NULL){
+		/* Calulate the rank of node curr */
 		rank += get_size(get_child(curr, LEFT)) + 1;
 		if(curr->data > x){
+			/* Search at the left subtree */
 			rank -= get_size(get_child(curr, LEFT)) + 1;
 			curr = curr->left;
 		}
 		else if(curr->data < x){
+			/* Search at the right subtree */
 			curr = curr->right;
 		}
 		else
+			/* Found x, return the rank of the curr */
 			return rank;
 	}
 	return 0;
@@ -349,14 +411,17 @@ void delete_stablize(node_t* P, direction_t dir) {
 	if(P == NULL)
 		return;
 
-	node_t* X = get_child(P, dir);
-	node_t* S = get_child(P, !dir);
-	node_t* SI = get_child(S, dir);
-	node_t* SO = get_child(S, !dir);
+	node_t* X = get_child(P, dir); //Node that replace the target
+	node_t* S = get_child(P, !dir); //Sibling of the X
+	node_t* SI = get_child(S, dir); //Child of the S, near from the X
+	node_t* SO = get_child(S, !dir); //Child of the S, far from the X
 
 	if(get_color(S) == BLACK) {
 		if(get_color(SO) == RED) {
-			/* case X-2 */
+			/* Case X-2 
+			 * Sibling is black, and far nephew is red.
+			 * Rotate from the parent, and update color.
+			 */
 			node_t* G = P->parent;
 			direction_t P_dir = which_child(P);
 
@@ -368,7 +433,13 @@ void delete_stablize(node_t* P, direction_t dir) {
 		}
 		else {
 			if(get_color(SI) == RED) {
-				/* case X-3 */
+				/* Case X-3 
+				 * Sibling is red, far nephew is black,
+				 * and near newphew is red.
+				 * Rotate from the S, update color, and 
+				 * stablize again. It will eventually
+				 * stablized by case X-2.
+				 */
 				set_child(P, rotate(S, !dir), !dir);
 
 				set_color(SI, BLACK);
@@ -378,12 +449,21 @@ void delete_stablize(node_t* P, direction_t dir) {
 			}
 			else {
 				if(get_color(P) == RED) {
-					/* case 1-1 */
+					/* Case 1-1
+					 * Sibling is red, both nephew are black,
+					 * and parent is red.
+					 * Update the color.
+					 */
 					set_color(P, BLACK);
 					set_color(S, RED);
 				}
 				else {
-					/* case 2-1 */
+					/* Case 2-1
+					 * Sibling is red, both nephew are black,
+					 * and parent is black.
+					 * Update the color, and stablize again
+					 * from the parent node recursively.
+					 */
 					set_color(S, RED);
 					if(P->parent != NULL)
 						delete_stablize(P->parent, which_child(P));
@@ -392,7 +472,14 @@ void delete_stablize(node_t* P, direction_t dir) {
 		}
 	}
 	else {
-		/* case 2-4 */
+		/* Case 2-4
+		 * Parent is black, sibling is red,
+		 * and both nephew are black.
+		 * Rotate at the parent, and stablize
+		 * again from itself again. It will
+		 * eventually stablized by case 1-1
+		 * or case 1-2 or case 1-3.
+		 */
 		node_t* G = P->parent;
 		direction_t P_dir = which_child(P);
 
@@ -407,11 +494,17 @@ void delete_stablize(node_t* P, direction_t dir) {
 }
 
 void print_tree(node_t* T, int space) {
+	/* Do the reverse inorder traversal,
+	 * with the parameter space.
+	 * Space will be related to the depth,
+	 * and so that result will display the
+	 * 2D tree.
+	 */
 	if(T == NULL)
 		return;
 	else {
 		if(space == 0)
-			printf("========================================\n");
+			printf("===================================================================\n");
 		print_tree(T->right, space + 1);
 		printf("\n");
 		for(int i = 0; i < space; i++)
@@ -422,6 +515,7 @@ void print_tree(node_t* T, int space) {
 }
 
 
+/* Safe get functions */
 color_t get_color(node_t* T) {
 	if(T == NULL)
 		return BLACK;
@@ -449,9 +543,7 @@ node_t* get_child(node_t* P, direction_t dir) {
 	}
 }
 
-/***********************************
- * set functions
- ***********************************/
+/* Safe set functions */
 void set_child(node_t* P, node_t* C, direction_t dir) {
 	if(P == NULL) {
 		root = C;
@@ -503,6 +595,7 @@ direction_t which_child(node_t* T) {
 		return LEFT;
 }
 
+/* Rotate and update size */
 node_t* rotate(node_t* T, direction_t dir) {
 	node_t* X = get_child(T, !dir);
 	node_t* Y = get_child(T, dir);
@@ -521,14 +614,28 @@ node_t* rotate(node_t* T, direction_t dir) {
 	return X;
 }
 
+/* Insert function for the checker.
+ * It will simply add the input to the
+ * last of the array.
+ * Returns 0 if there is duplicated node,
+ * otherwise x.
+ */
 int check_insert(int x){
 	for(int i = 0; i < cnt; i++){
 		if(x == v[i])
 			return 0;
 	}
+	v[cnt] = x;
 	cnt++;
 	return x;
 }
+
+/* Delete function for the Checker.
+ * It will delete the x and pull every
+ * node behind the x.
+ * Returns 0 if there is no matching
+ * elements, otherwise x.
+ */
 int check_delete(int x){
 	int k = 0;
 	for(int i = 0; i < cnt; i++){
@@ -546,6 +653,12 @@ int check_delete(int x){
 	}
 }
 
+/* Select function for the Checker.
+ * Check if the i is valid, and then sort
+ * array, return (i-1)-th element of the 
+ * array.
+ * Returns 0 if i is invalid.
+ */
 int check_select(int i){
 	if(i - 1 < cnt) {
 		qsort(v, cnt, sizeof(int), cmp);
@@ -556,6 +669,13 @@ int check_select(int i){
 	}
 }
 
+/* Rank function for the Checker.
+ * It will first sort the array, and
+ * find the element matches with x.
+ * It will return it's index + 1, which 
+ * is rank.
+ * Returns 0 if there is no matching x.
+ */
 int check_rank(int x){
 	qsort(v, cnt, sizeof(int), cmp);
 	for(int i = 0; i < cnt; i++){
@@ -566,10 +686,17 @@ int check_rank(int x){
 	return 0;
 }
 
+/* Checker function.
+ * It will compare the output sequence created by rb_tree
+ * and by checker itself. It will return 0 if it does not
+ * match, otherwise 1.
+ */
 int check(int opt_seq[], int in_seq[], int out_seq[], int n){
+	/* Reset the global variables */
     cnt = 0;
 	memset(v, 0, 10000*sizeof(int));
 
+	/* Check for the Output sequences */
     for(int i=0;i<n;i++){
 		if(opt_seq[i]==INSERT){
             if(check_insert(in_seq[i])!=out_seq[i]){

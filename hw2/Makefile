@@ -7,12 +7,20 @@ input.txt: test_gen.c
 run: hw2_c.h main.c
 	gcc -g -o run main.c hw2_c.h
 
+verbose: input.txt
+	gcc -g -DVERBOSE -o run main.c hw2_c.h
+
 shell: run
 	./run
+	rm ./run
 
 random: run input.txt
 	./run < input.txt
-	rm input.txt gen
+	rm -rf input.txt gen
+
+debug: run
+	gdb ./run
+	rm ./run
 
 all: shell
 
