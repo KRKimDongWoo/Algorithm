@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include "hw3_c.h"
+#define RUNNING_REP 100
 
 #ifndef FILE_INPUT_ENABLED
 #define STD_INPUT_ENABLED
@@ -62,11 +63,13 @@ int main(){
 	int* ans_mat = (int*) calloc(num_v, sizeof(int));
 	
 	start_list = clock();
-	find_scc_with_adj_list(adj_list, cnt, num_v, num_e, ans_list);
+	for(int i = 0; i < RUNNING_REP; i++)
+		find_scc_with_adj_list(adj_list, cnt, num_v, num_e, ans_list);
 	end_list = clock();	
 	
 	start_mat = clock();
-	find_scc_with_adj_mat(adj_mat, num_v, num_e, ans_mat);
+	for(int i = 0; i < RUNNING_REP; i++)
+		find_scc_with_adj_mat(adj_mat, num_v, num_e, ans_mat);
 	end_mat = clock();
 
 
@@ -116,7 +119,7 @@ int main(){
 	if(!err_flag) printf("Successful!\n");
 #endif
 
-	printf("list takes %0.3fms\n", (float)(end_list - start_list)/(CLOCKS_PER_SEC / 1000));
-	printf("mat takes %0.3fms\n", (float)(end_mat - start_mat)/(CLOCKS_PER_SEC / 1000));
+	printf("list takes %0.3fms\n", (float)(end_list - start_list)/(CLOCKS_PER_SEC / 1000)/RUNNING_REP);
+	printf("mat takes %0.3fms\n", (float)(end_mat - start_mat)/(CLOCKS_PER_SEC / 1000)/RUNNING_REP);
 	return 0;
 }
